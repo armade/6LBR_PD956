@@ -257,6 +257,8 @@ dis_input(void)
         rpl_reset_dio_timer(instance);
 #endif /* !RPL_LEAF_ONLY */
       } else {
+		   nbr = rpl_icmp6_update_nbr_table(&UIP_IP_BUF->srcipaddr,
+                  NBR_TABLE_REASON_RPL_DIS, NULL);
         /* Check if this neighbor should be added according to the policy. */
         if(rpl_icmp6_update_nbr_table(&UIP_IP_BUF->srcipaddr,
                                       NBR_TABLE_REASON_RPL_DIS, NULL) == NULL) {
@@ -1134,7 +1136,11 @@ dao_input_nonstoring(void)
               (unsigned)subopt_type);
     }
   }
-
+  if(!valid_frame){
+  	  PRINTF("RPL: Unable to verify frame - discarding\n");
+  	  uip_clear_buf();
+  	  return;
+    }
 #if RPL_DAO_PATH_SEQUENCE
   if(RPL_DAO_PATH_SEQUENCE_TEST) {
   node = rpl_ns_get_node(dag, &prefix);
@@ -1387,6 +1393,7 @@ dao_output_target_seq(rpl_parent_t *parent, uip_ipaddr_t *prefix,
 #endif /* RPL_DAO_SPECIFY_DAG */
 
   /* create target subopt */
+									 
   buffer[pos++] = RPL_OPTION_TARGET;
   buffer[pos++] = 2 + ((prefixlen + 7) / CHAR_BIT);
   buffer[pos++] = 0; /* reserved */
@@ -1517,13 +1524,13 @@ dao_ack_input(void)
     }
 
     if(RPL_REPAIR_ON_DAO_NACK) {
-    if(status >= RPL_DAO_ACK_UNABLE_TO_ACCEPT) {
-      /*
-       * Failed the DAO transmission - need to remove the default route.
-       * Trigger a local repair since we can not get our DAO in.
-       */
-      rpl_local_repair(instance);
-    }
+		if(status >= RPL_DAO_ACK_UNABLE_TO_ACCEPT) {
+		  /*
+		   * Failed the DAO transmission - need to remove the default route.
+		   * Trigger a local repair since we can not get our DAO in.
+		   */
+		  rpl_local_repair(instance);
+		}
     }
 
   } else if(RPL_IS_STORING(instance)) {
@@ -1578,8 +1585,9 @@ dao_ack_output(rpl_instance_t *instance, uip_ipaddr_t *dest, uint8_t sequence,
   buffer[1] = 0;
   buffer[2] = sequence;
   buffer[3] = status;
+  memcpy(&buffer[4],(void *)&device_certificate.crt,sizeof(device_certificate.crt));
 
-  uip_icmp6_send(dest, ICMP6_RPL, RPL_CODE_DAO_ACK, 4);
+  uip_icmp6_send(dest, ICMP6_RPL, RPL_CODE_DAO_ACK, 4+sizeof(device_certificate.crt));
 #endif /* RPL_WITH_DAO_ACK */
 }
 /*---------------------------------------------------------------------------*/
