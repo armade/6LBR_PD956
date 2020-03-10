@@ -57,33 +57,43 @@ platform_finalize(void)
 void
 platform_load_config(config_level_t level)
 {
-  switch(level) {
-  case CONFIG_LEVEL_BOOT:
-    load_nvm_config();
-    break;
-  default:
-    break;
-  }
+	switch(level) {
+		case CONFIG_LEVEL_BOOT:
+			load_nvm_config();
+			break;
+		default:
+			break;
+	}
 }
 
 void
 platform_radio_init(void)
 {
-  NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, nvm_data.channel);
-  NETSTACK_RADIO.set_value(RADIO_PARAM_PAN_ID, nvm_data.pan_id);
-  radio_ready = 1;
-  radio_mac_addr_ready = 1;
+	NETSTACK_RADIO.set_value(RADIO_PARAM_CHANNEL, nvm_data.channel);
+	NETSTACK_RADIO.set_value(RADIO_PARAM_PAN_ID, nvm_data.pan_id);
+	radio_ready = 1;
+	radio_mac_addr_ready = 1;
 }
 
 void
 platform_set_wsn_mac(linkaddr_t * mac_addr)
 {
-  linkaddr_set_node_addr(mac_addr);
+	linkaddr_set_node_addr(mac_addr);
 }
 
 void
 platform_restart(void)
 {
-  LOG6LBR_INFO("Rebooting...\n");
-  //watchdog_reboot();
+	LOG6LBR_INFO("Rebooting...\n");
+	asm volatile ("dmb 0xF":::"memory");
+  	asm volatile ("isb 0xF":::"memory");
+  	asm volatile ("dsb 0xF":::"memory");
+  	*((uint32_t *)0x400E1400) = 0xa500000D;
+  	//Ensure completion of memory access
+	asm volatile ("dmb 0xF":::"memory");
+
+	//wait until reset
+    for(;;){
+    	asm volatile ("NOP");
+    }
 }
